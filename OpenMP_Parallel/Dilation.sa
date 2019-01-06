@@ -1,0 +1,113 @@
+                   .global Dilation
+Dilation  .cproc New_Dis,dil,ero
+
+	.reg d1,d2
+	.reg iniv,iniv1,i,j,width,height,ii,jj,k,position,row,row_r,positioni,rowi,i_low,kk,thre,thre1,j_low
+	.reg iniv2,iniv3,temp,tt,cnt
+	.no_mdep
+
+		mvk 0, iniv
+		mvkl 255,iniv1
+		mvkh 255,iniv1
+		mvk  1,iniv2
+		mvkl 0xffffffff,iniv3
+		mvkh 0xffffffff,iniv3
+		mvkl 1242,width
+		mvkh 1242,width
+		mvkl 375, height
+		mvkh 375, height
+		mvkl 179, i_low
+		mvkh 179, i_low
+		mvkl 100,j_low
+		mvkh 100,j_low
+		zero tt
+		zero temp
+		mvkl 42,cnt
+		mvkh 42,cnt
+
+		;ldbu *h,i   ;47
+
+		sub height,4,i
+loop:
+		mvkl 500,j
+		mvkh 500,j
+loop1:
+
+		mpy i,width,positioni
+		add positioni,j,position  	;(i,j)position
+		sub i,8,ii
+		mpy ii,width,rowi
+		sub j,8,jj
+		add jj,rowi,row	 			;(ii,jj)window initial position
+
+		mvk 17,kk
+loop2:
+
+		ldndw *New_Dis(row),d2:d1
+		lor d2,iniv,thre
+		lor d1,iniv,thre1
+		lor thre,thre1,thre
+		[thre] stb iniv1,*dil[position]
+		[thre] stb iniv1,*ero[position]
+		add row,width,row
+
+		sub kk,1,kk
+		[kk] b loop2
+
+		sub j,1,j
+		sub j,j_low,k
+		[k] b loop1
+
+		sub i,1,i
+		sub i,i_low,k
+		[k] b loop
+
+		sub height,4,i
+loope:
+		mvkl 500,j
+		mvkh 500,j
+loope1:
+
+		mpy i,width,positioni
+		add positioni,j,position  	;(i,j)position
+		sub i,10,ii
+		mpy ii,width,rowi
+		sub j,8,jj
+		add jj,rowi,row	 			;(ii,jj)window initial position
+		zero tt
+		mvkl 21,kk
+		mvkh 21,kk
+loope2:
+
+		ldndw *dil(row),d2:d1
+		cmpeq d2,iniv3,thre
+		cmpeq d1,iniv3,thre1
+		and thre,thre1,thre
+		;[!thre] stb iniv,*ero[position]
+		;[!thre] b label
+		add thre,thre1,temp
+		add temp,tt,tt
+		add row,width,row
+
+		sub kk,1,kk
+		[kk] b loope2
+		cmpeq tt,cnt,k
+		[!k] stb iniv,*ero[position]
+
+		sub j,1,j
+		sub j,j_low,k
+		[k] b loope1
+
+		sub i,1,i
+		sub i,i_low,k
+		[k] b loope
+
+
+             .return
+             .endproc
+
+
+
+
+
+

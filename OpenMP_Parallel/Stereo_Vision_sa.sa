@@ -1,0 +1,163 @@
+                   .global Stereo_Vision_sa
+Stereo_Vision_sa  .cproc L,R,numsp,Lookup_L,Lookup_R,h
+
+	.reg d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,sum_d
+	.reg L1,L2,L3,L4,L5,L6,L7,L8,L9,L10,sum_L,aver
+	.reg dr1,dr2,dr3,dr4,dr5,dr6,dr7,dr8,dr9,dr10,sum_dr
+	.reg R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,sum_R,aver_R
+	.reg iniv,num,i,j,width,height,ii,jj,k,k_1,position,row,positioni,rowi,H
+	.reg s1,s2,s3,s4,s5,s6,s7,s8,s9,s10
+	.reg sr1,sr2,sr3,sr4,sr5,sr6,sr7,sr8,sr9,sr10
+	.reg templh:templl,tempdh:tempdl,temprh:temprl,tempdrh:tempdrl
+	.reg row2,row3,row4,row5
+	.no_mdep
+
+		mvkl 0x01010101, iniv
+		mvkh 0x01010101, iniv
+		mvkl 1242,width
+		mvkh 1242,width
+		mvkl 375, height
+		mvkh 375, height
+		ldw *numsp,num
+
+		ldbu *h,i   ;47
+
+		;sub height,3,i				;i starts from 375-3=372
+		;sub height,2,i
+loop:
+
+		sub width,4,j				;j starts from 1242-4=1238
+		mpy i,width,positioni
+		sub i,2,ii
+		mpy ii,width,rowi
+loop1:
+		zero sum_d    				;sum = 0
+		zero sum_L
+		zero sum_R
+		zero sum_dr
+
+		add positioni,j,position  	;(i,j)position
+		sub j,4,jj
+		add jj,rowi,row	 			;(ii,jj)window initial position
+
+		add row,width,row2			;get the left place of the second line in the window
+		add row2,width,row3			;get the left place of the third line in the window
+		add row3,width,row4			;get the left place of the forth line in the window
+		add row4,width,row5			;get the left place of the fifth line in the window
+		;ldndw *L++,d2:d1
+		ldndw *L(row),d2:d1			;load 8 pixle values of the first line of the left image
+		ldndw *L(row2),d4:d3		;load 8 pixle values of the second line of the left image
+		ldndw *L(row3),d6:d5		;load 8 pixle values of the third line of the left image
+		ldndw *L(row4),d8:d7		;load 8 pixle values of the forth line of the left image
+		ldndw *L(row5),d10:d9		;load 8 pixle values of the fifth line of the left image
+
+		ldndw *R(row),dr2:dr1		;load 8 pixle values of the first line of the right image
+		ldndw *R(row2),dr4:dr3		;load 8 pixle values of the second line of the right image
+		ldndw *R(row3),dr6:dr5		;load 8 pixle values of the third line of the right image
+		ldndw *R(row4),dr8:dr7		;load 8 pixle values of the forth line of the right image
+		ldndw *R(row5),dr10:dr9		;load 8 pixle values of the fifth line of the right image
+
+;;;;;;;;;;;;;Left image DOTP and SUM;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		dotpu4 d1,d1,L1				;dotp of the 1st four pixles in the 1st line of the window in the left image
+		dotpu4 d2,d2,L2				;dotp of the 2nd four pixles in the 1st line of the window in the left image
+		dotpu4 iniv,d1, s1			;sum of the 1st four pixles in the 1st line of the window in the left image
+		dotpu4 iniv,d2, s2			;sum of the 2nd four pixles in the 1st line of the window in the left image
+		dotpu4 d3,d3,L3				;dotp of the 1st four pixles in the 2nd line of the window in the left image
+		dotpu4 d4,d4,L4				;dotp of the 2nd four pixles in the 2nd line of the window in the left image
+		dotpu4 iniv,d3, s3			;sum of the 1st four pixles in the 2nd line of the window in the left image
+		dotpu4 iniv,d4, s4			;sum of the 2nd four pixles in the 2nd line of the window in the left image
+		dotpu4 d5,d5,L5
+		dotpu4 d6,d6,L6
+		dotpu4 iniv,d5, s5
+		dotpu4 iniv,d6, s6
+		dotpu4 d7,d7,L7
+		dotpu4 d8,d8,L8
+		dotpu4 iniv,d7, s7
+		dotpu4 iniv,d8, s8
+		dotpu4 d9,d9,L9
+		dotpu4 d10,d10,L10
+		dotpu4 iniv,d9, s9
+		dotpu4 iniv,d10, s10
+
+		dadd L2:L1,L4:L3,templh:templl
+		dadd templh:templl,L6:L5,templh:templl
+		dadd templh:templl,L8:L7,templh:templl
+		dadd templh:templl,L10:L9,templh:templl
+		add  templh,templl,sum_L					;DOTP of the whole window in the left image
+
+		dadd s2:s1,s4:s3,tempdh:tempdl
+		dadd tempdh:tempdl,s6:s5,tempdh:tempdl
+		dadd tempdh:tempdl,s8:s7,tempdh:tempdl
+		dadd tempdh:tempdl,s10:s9,tempdh:tempdl
+		add  tempdh,tempdl,sum_d					;SUM of the whole window in the left image
+
+;;;;;;;;;;;;;Right image DOTP and SUM;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		dotpu4 dr1,dr1,R1
+		dotpu4 dr2,dr2,R2
+		dotpu4 iniv,dr1, sr1
+		dotpu4 iniv,dr2, sr2
+		dotpu4 dr3,dr3,R3
+		dotpu4 dr4,dr4,R4
+		dotpu4 iniv,dr3, sr3
+		dotpu4 iniv,dr4, sr4
+		dotpu4 dr5,dr5,R5
+		dotpu4 dr6,dr6,R6
+		dotpu4 iniv,dr5, sr5
+		dotpu4 iniv,dr6, sr6
+		dotpu4 dr7,dr7,R7
+		dotpu4 dr8,dr8,R8
+		dotpu4 iniv,dr7, sr7
+		dotpu4 iniv,dr8, sr8
+		dotpu4 dr9,dr9,R9
+		dotpu4 dr10,dr10,R10
+		dotpu4 iniv,dr9, sr9
+		dotpu4 iniv,dr10, sr10
+
+		dadd R2:R1,R4:R3,temprh:temprl
+		dadd temprh:temprl,R6:R5,temprh:temprl
+		dadd temprh:temprl,R8:R7,temprh:temprl
+		dadd temprh:temprl,R10:R9,temprh:temprl
+		add  temprh,temprl,sum_R				   ;DOTP of the whole window in the right image
+
+		dadd sr2:sr1,sr4:sr3,tempdrh:tempdrl
+		dadd tempdrh:tempdrl,sr6:sr5,tempdrh:tempdrl
+		dadd tempdrh:tempdrl,sr8:sr7,tempdrh:tempdrl
+		dadd tempdrh:tempdrl,sr10:sr9,tempdrh:tempdrl
+		add  tempdrh,tempdrl,sum_dr					;SUM of the whole window in the left image
+
+;;;;;;;;;;;Left;;;;;;;;;;;;
+		intspu sum_d,sum_d							;Convert Left SUM to Single-Precision Floating Point
+		intspu sum_L,sum_L							;Convert Left DOTP to Single-Precision Floating Point
+		mpysp sum_d,num,aver						;average = sum*0.025
+		mpysp aver,sum_d,sum_d						;sum_d = average*sum
+		subsp sum_L,sum_d,sum_d						;deviation = DOTP - sum_d
+		[sum_d] rsqrsp sum_d,sum_d					;sum_d = 1/sqrt(deviation)
+
+		;stw aver,*AVERAGE[position]     ;store window average value of the left image
+		;stw sum_d,*DOTP[position]		 ;store (dotp-average*sum) of the left image
+		stdw sum_d:aver, *Lookup_L[position]
+;;;;;;;;;;;;Right;;;;;;;;;;
+		intspu sum_dr,sum_dr
+		intspu sum_R,sum_R
+		mpysp sum_dr,num,aver_R
+		mpysp aver_R,sum_dr,sum_dr
+		subsp sum_R,sum_dr,sum_dr
+		[sum_dr] rsqrsp sum_dr,sum_dr
+		;stw aver_R,*AVERAGE_R[position]
+		;stw sum_dr,*DOTP_R[position]
+		stdw sum_dr:aver_R, *Lookup_R[position]
+
+		sub j,1,j
+		sub j,3,k
+		[k] b loop1
+
+		sub i,1,i
+		sub i,1,k_1
+		[k_1] b loop
+
+             .return
+             .endproc
+
+;Linear Code w/o Disparity cycle:      10722625 cycles
+;time spent total = 0.01072083800
+

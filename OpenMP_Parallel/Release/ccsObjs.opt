@@ -1,0 +1,1 @@
+"./Dilation.obj" "./Edge_Histogram.obj" "./NCC_all_orin.obj" "./NCC_sa_all.obj" "./NCC_sa_last_line.obj" "./Stereo_Vision_sa.obj" "./main.obj" -l"configPkg/linker.cmd" -llibc.a 

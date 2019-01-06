@@ -1,0 +1,101 @@
+                   .global Edge_Histogram
+Edge_Histogram  .cproc Edgeleft,Coedge
+
+	.reg d1,d2,d3,d4,d5,d6,d7,d8,d9,d10
+	.reg dr1,dr2,dr3,dr4,dr5,dr6,dr7,dr8
+	.reg w1,w2,w3,w4,w5,w6,w7,w8,w9,w10
+	.reg wr1,wr2,wr3,wr4,wr5,wr6,wr7,wr8
+	.reg iniv,i,j,width,height,ii,jj,k,k_1,position,row,row_r,positioni,rowi,i_low,thre
+	.reg s1,s2,s3,s4,s5,s6,s7,s8,s9
+	.reg templh:templl,temprh:temprl,sum_d
+	.no_mdep
+
+		mvkl 0x01010101, iniv
+		mvkh 0x01010101, iniv
+		mvkl 1242,width
+		mvkh 1242,width
+		mvkl 375, height
+		mvkh 375, height
+		mvkl 179, i_low
+		mvkh 179, i_low
+		mvk 10,thre
+
+		;ldbu *h,i   ;47
+
+		sub height,4,i
+
+loop:
+
+		mvkl 700,j
+		mvkh 700,j
+
+		mpy i,width,positioni
+		sub i,4,ii
+		mpy ii,width,rowi
+loop1:
+		zero sum_d    				;sum = 0
+
+		add positioni,j,position  	;(i,j)position
+		sub j,4,jj
+		add jj,rowi,row	 			;(ii,jj)window initial position
+
+		ldndw *Edgeleft(row),d2:d1
+		add row,width,row
+		ldndw *Edgeleft(row),d4:d3
+		add row,width,row
+		ldndw *Edgeleft(row),d6:d5
+		add row,width,row
+		ldndw *Edgeleft(row),d8:d7
+		add row,width,row
+		ldndw *Edgeleft(row),d10:d9
+		add row,width,row
+		ldndw *Edgeleft(row),dr2:dr1
+		add row,width,row
+		ldndw *Edgeleft(row),dr4:dr3
+		add row,width,row
+		ldndw *Edgeleft(row),dr6:dr5
+		add row,width,row
+		ldndw *Edgeleft(row),dr8:dr7
+
+;;;;;;;;;;;;;Left image DOTP and SUM;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		add4 d1,d2,d1
+		add4 d3,d4,d3
+		add4 d5,d6,d5
+		add4 d7,d8,d7
+		add4 d9,d10,d9
+		add4 dr1,dr2,dr1
+		add4 dr3,dr4,dr3
+		add4 dr5,dr6,dr5
+		add4 dr7,dr8,dr7
+
+		dotpu4 iniv,d1,s1
+		dotpu4 iniv,d3,s2
+		dotpu4 iniv,d5,s3
+		dotpu4 iniv,d7,s4
+		dotpu4 iniv,d9,s5
+		dotpu4 iniv,dr1,s6
+		dotpu4 iniv,dr3,s7
+		dotpu4 iniv,dr5,s8
+		dotpu4 iniv,dr7,s9
+
+		dadd s2:s1,s4:s3,templh:templl
+		dadd templh:templl,s6:s5,templh:templl
+		dadd templh:templl,s8:s7,templh:templl
+		add  templh,templl,sum_d
+		add sum_d,s9,sum_d
+
+		cmpgt sum_d,thre,k
+		[k] stw sum_d, *Coedge[position]
+
+		sub j,1,j
+		sub j,9,k
+		[k] b loop1
+
+		sub i,1,i
+		sub i,i_low,k_1
+		[k_1] b loop
+
+             .return sum_d
+             .endproc
+
+

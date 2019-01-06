@@ -1,0 +1,273 @@
+		.global NCC_sa_all
+NCC_sa_all  .cproc L,R,Disparity,Disp,Lookup_L,Lookup_R,J1,J2,Search_Limit2,Search_Limit1
+
+	.reg R1,R2,R3,R4,R5,R6,R7,R8,R9,R10
+	.reg L1,L2,L3,L4,L5,L6,L7,L8,L9,L10
+	.reg LR1,LR2,LR3,LR4,LR5,LR6,LR7,LR8,LR9,LR10
+	.reg dotp_LR,temp2,temp1,temp,temp22,temp11
+	.reg iniv,num,search_range,i,j,k,k1,width,height,ii,jj,position,position_r,row,row_r,tt,row_l,width1
+	.reg aver_L,aver_R,N, result_up,dev_L,dev_R,result_down,ncc,max,dst,m1,m2,m3,distance
+	.reg bl0_1,bl0_3,bl0_5,bl1_1,bl1_3,bl1_5,bl2_1,bl2_3,bl2_5,init,init1,init2
+	.reg const1,const2,cnt_min,cnt_max
+	.reg s1,s2,s3,s11,s22
+	.reg limit1,limit2
+	.no_mdep
+
+		ldhu *J1,j
+		ldhu *J2,m2
+		sub m2,1,m2
+		mvk 143,k
+		ldhu *Search_Limit2, limit2
+		ldhu *Search_Limit1, limit1
+		mvk 1242,width
+		mvk 40,N
+		mvk 80,const2		 ;80
+		zero const1   		 ;0
+		;add search_range,3, m2       ;83
+		mpy width,2,width1
+		intspu N,N
+
+		mv L,s11
+		mv R,s22
+		min2 limit2,const2,limit2
+
+		zero k1
+		zero init
+		zero init1
+		zero init2
+		zero bl0_3
+		zero bl1_3
+		zero bl2_3
+
+		add width,j,init
+		sub init,1,init
+		ldb *Disparity[init], bl0_3
+		add init,1,init1
+		ldb *Disparity[init1], bl1_3
+		add init1,1,init2
+		ldb *Disparity[init2], bl2_3
+		sub bl0_3,2,bl0_1			;initialize block0 and get five search_range values
+		sub bl1_3,2,bl1_1			;initialize block1 and get five search_range values
+		sub bl2_3,2,bl2_1
+		add bl0_3,2,bl0_5
+		add bl1_3,2,bl1_5
+		add bl2_3,2,bl2_5
+		max2 bl0_1, const1, bl0_1
+		max2 bl1_1, const1, bl1_1
+		max2 bl2_1, const1, bl2_1
+		min2 bl0_5, const2, bl0_5
+		min2 bl1_5, const2, bl1_5
+		min2 bl2_5, const2, bl2_5
+
+loop_j:
+		zero max
+		sub s11,width1,s1
+
+		sub j,4,jj
+		;ldndw *Lookup_L[position],dev_L:aver_L
+		ldndw *Lookup_L[j],dev_L:aver_L
+
+		ldndw *s1(jj), L2:L1			;load values of the window centered at (i,j) in the left image
+		add s1,width,s1
+		ldndw *s1(jj), L4:L3
+		add s1,width,s1
+		ldndw *s1(jj), L6:L5
+		add s1,width,s1
+		ldndw *s1(jj), L8:L7
+		add s1,width,s1
+		ldndw *s1(jj), L10:L9
+;;;;;;;;;;;;;;;;;;;;;Block Loop ;;;;;;;;;;;;;;;;;;
+
+		mv bl0_1,cnt_min
+		sub cnt_min,1,cnt_min
+		mv bl0_5,k1
+loop_blk0:
+		sub s22,width1,s2
+		zero dotp_LR
+		sub j,k1,position_r
+		sub jj,k1,row_r
+
+		ldndw *s2(row_r), R2:R1
+		add s2,width,s2
+		ldndw *s2(row_r), R4:R3
+		add s2,width,s2
+		ldndw *s2(row_r), R6:R5
+		add s2,width,s2
+		ldndw *s2(row_r), R8:R7
+		add s2,width,s2
+		ldndw *s2(row_r), R10:R9
+		ldndw *Lookup_R[position_r], dev_R:aver_R
+
+;dotp of corresponding windows of the left image and right image
+		dotpu4 L1,R1,LR1
+		dotpu4 L2,R2,LR2
+		dotpu4 L3,R3,LR3
+		dotpu4 L4,R4,LR4
+		dotpu4 L5,R5,LR5
+		dotpu4 L6,R6,LR6
+		dotpu4 L7,R7,LR7
+		dotpu4 L8,R8,LR8
+		dotpu4 L9,R9,LR9
+		dotpu4 L10,R10,LR10
+
+		dadd LR2:LR1,LR4:LR3,temp2:temp1
+		dadd temp2:temp1,LR6:LR5,temp2:temp1
+		dadd temp2:temp1,LR8:LR7,temp2:temp1
+		dadd temp2:temp1,LR10:LR9,temp2:temp1
+		add temp1,temp2,dotp_LR
+
+;NCC calculation of a 5*8 window
+		intspu dotp_LR,dotp_LR
+		mpysp aver_L,N,temp
+		mpysp temp,aver_R, result_up
+		mpysp dev_L,dev_R, result_down  	;Denominator calculation: 1/(sqrtL*sqrtR)
+		subsp dotp_LR, result_up,result_up	;Numerator calculation: (dotpLR-N*averL*averR)
+		mpysp result_up,result_down,ncc
+
+		cmpgtsp ncc,max,dst
+		[dst] mv ncc,max
+		[dst] mv k1,distance
+
+		sub k1,1,k1
+		sub k1,cnt_min,tt
+		[tt] b loop_blk0
+
+
+		mv bl1_1, cnt_min
+		sub cnt_min,1,cnt_min
+		mv bl1_5,k1
+loop_blk1:
+		sub s22,width1,s2
+		zero dotp_LR
+		sub j,k1,position_r
+		sub jj,k1,row_r
+
+		ldndw *s2(row_r), R2:R1
+		add s2,width,s2
+		ldndw *s2(row_r), R4:R3
+		add s2,width,s2
+		ldndw *s2(row_r), R6:R5
+		add s2,width,s2
+		ldndw *s2(row_r), R8:R7
+		add s2,width,s2
+		ldndw *s2(row_r), R10:R9
+
+		ldndw *Lookup_R[position_r],dev_R:aver_R
+
+;dotp of corresponding windows of the left image and right image
+		dotpu4 L1,R1,LR1
+		dotpu4 L2,R2,LR2
+		dotpu4 L3,R3,LR3
+		dotpu4 L4,R4,LR4
+		dotpu4 L5,R5,LR5
+		dotpu4 L6,R6,LR6
+		dotpu4 L7,R7,LR7
+		dotpu4 L8,R8,LR8
+		dotpu4 L9,R9,LR9
+		dotpu4 L10,R10,LR10
+
+		dadd LR2:LR1,LR4:LR3,temp2:temp1
+		dadd temp2:temp1,LR6:LR5,temp2:temp1
+		dadd temp2:temp1,LR8:LR7,temp2:temp1
+		dadd temp2:temp1,LR10:LR9,temp2:temp1
+		add temp1,temp2,dotp_LR
+
+;NCC calculation of a 5*8 window
+		intspu dotp_LR,dotp_LR
+		mpysp aver_L,N,temp
+		mpysp temp,aver_R, result_up
+		mpysp dev_L,dev_R, result_down  	;Denominator calculation: 1/(sqrtL*sqrtR)
+		subsp dotp_LR, result_up,result_up	;Numerator calculation: (dotpLR-N*averL*averR)
+		mpysp result_up,result_down,ncc
+
+		cmpgtsp ncc,max,dst
+		[dst] mv ncc,max
+		[dst] mv k1,distance
+
+		sub k1,1,k1
+		sub k1,cnt_min,tt
+		[tt] b loop_blk1
+
+
+		mv bl2_5,k1
+		mv bl2_1,cnt_min
+		sub cnt_min,1,cnt_min
+loop_blk2:
+		sub s22,width1,s2
+		zero dotp_LR
+		sub j,k1,position_r
+		sub jj,k1,row_r
+
+		ldndw *s2(row_r), R2:R1
+		add s2,width,s2
+		ldndw *s2(row_r), R4:R3
+		add s2,width,s2
+		ldndw *s2(row_r), R6:R5
+		add s2,width,s2
+		ldndw *s2(row_r), R8:R7
+		add s2,width,s2
+		ldndw *s2(row_r), R10:R9
+		ldndw *Lookup_R[position_r],dev_R:aver_R
+
+;dotp of corresponding windows of the left image and right image
+		dotpu4 L1,R1,LR1
+		dotpu4 L2,R2,LR2
+		dotpu4 L3,R3,LR3
+		dotpu4 L4,R4,LR4
+		dotpu4 L5,R5,LR5
+		dotpu4 L6,R6,LR6
+		dotpu4 L7,R7,LR7
+		dotpu4 L8,R8,LR8
+		dotpu4 L9,R9,LR9
+		dotpu4 L10,R10,LR10
+
+		dadd LR2:LR1,LR4:LR3,temp2:temp1
+		dadd temp2:temp1,LR6:LR5,temp2:temp1
+		dadd temp2:temp1,LR8:LR7,temp2:temp1
+		dadd temp2:temp1,LR10:LR9,temp2:temp1
+		add temp1,temp2,dotp_LR
+
+;NCC calculation of a 5*8 window
+		intspu dotp_LR,dotp_LR
+		mpysp aver_L,N,temp
+		mpysp temp,aver_R, result_up
+		mpysp dev_L,dev_R, result_down  	;Denominator calculation: 1/(sqrtL*sqrtR)
+		subsp dotp_LR, result_up,result_up	;Numerator calculation: (dotpLR-N*averL*averR)
+		mpysp result_up,result_down,ncc
+
+		cmpgtsp ncc,max,dst
+		[dst] mv ncc,max
+		[dst] mv k1,distance
+
+		sub k1,1,k1
+		sub k1,cnt_min,tt
+		[tt] b loop_blk2
+
+		stb distance,*Disp[k]
+		sub k,1,k
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		mv bl1_1, bl2_1
+		mv bl1_5, bl2_5
+		mv bl0_1, bl1_1
+		mv bl0_5, bl1_5
+		sub init,1,init
+		ldb *Disparity[init], bl0_3		;load new block0 and get five search_range values
+		sub bl0_3,2,bl0_1
+		add bl0_3,2,bl0_5
+		max2 bl0_1, const1, bl0_1
+		min2 bl0_5, const2, bl0_5
+
+		max2 bl0_1,limit1,bl0_1
+		max2 bl0_5,limit1,bl0_5
+		min2 bl0_1,limit2,bl0_1
+		min2 bl0_5,limit2,bl0_5
+
+		sub j,1,j
+		sub j,m2,tt			;j>=84
+		[tt] b loop_j
+
+		.return
+        .endproc
+
+
+
